@@ -1,11 +1,17 @@
 use std::env;
 use reqwest::Client;
+use select::document::Document;
+use select::predicate::Name;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), String> {
     let url = get_url()?;
     let body = make_request(&url).await?;
-    println!("{}", body);
+
+    for url in get_urls(&body)? {
+        println!("{}", url);
+    }
+
     Ok(())
 }
 
@@ -27,3 +33,16 @@ async fn make_request(url: &str) -> Result<String, String> {
 
     Ok(body)
 }
+
+fn get_urls(body: &str) -> Result<Vec<String>, String> {
+    let document = Document::from_read(body.as_bytes())
+        .map_err(|err| err.to_string())?;
+
+    let urls = document.find(Name("a"))
+        .filter_map(|node| node.attr("href").map(|x| x.to_string()))
+        .collect();
+
+    Ok(urls)
+}
+
+
