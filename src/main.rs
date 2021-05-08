@@ -16,11 +16,12 @@ async fn main() -> Result<(), String> {
     let url = Url::parse(&url).map_err(|err| err.to_string())?;
 
     let (sender, receiver) = mpsc::channel::<Url>(1_000_000);
-    let mut url_stream = ReceiverStream::new(receiver);
+    let url_stream = ReceiverStream::new(receiver);
 
     sender.send(url).await.map_err(|err| err.to_string())?;
 
-    while let Some(url) = url_stream.next().await {
+    let sender = &sender;
+    url_stream.for_each_concurrent(None,|url| async move {
         if let Ok(body) = make_request(url.clone()).await {
             println!("{}", url);
             if let Ok(urls) = get_urls(&body, &url) {
@@ -29,7 +30,7 @@ async fn main() -> Result<(), String> {
                 }
             }
         }
-    }
+    }).await;
 
     Ok(())
 }
