@@ -9,6 +9,7 @@ use tokio_stream::wrappers::ReceiverStream;
 
 use std::collections::HashSet;
 use std::time::Duration;
+use std::cell::RefCell;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), String> {
@@ -20,13 +21,18 @@ async fn main() -> Result<(), String> {
 
     sender.send(url).await.map_err(|err| err.to_string())?;
 
+    let visited = &RefCell::new(HashSet::new());
+
     let sender = &sender;
     url_stream.for_each_concurrent(None,|url| async move {
         if let Ok(body) = make_request(url.clone()).await {
             println!("{}", url);
             if let Ok(urls) = get_urls(&body, &url) {
                 for url in urls {
-                    sender.send(url).await;
+                    if !visited.borrow().contains(&url) {
+                        visited.borrow_mut().insert(url.clone());
+                        sender.send(url).await;
+                    }
                 }
             }
         }
